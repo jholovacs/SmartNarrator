@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+COPY SmartNarrator.sln ./
+COPY SmartNarrator.Domain/SmartNarrator.Domain.csproj SmartNarrator.Domain/
+COPY SmartNarrator.Application/SmartNarrator.Application.csproj SmartNarrator.Application/
+COPY SmartNarrator.Infrastructure/SmartNarrator.Infrastructure.csproj SmartNarrator.Infrastructure/
+COPY SmartNarrator.Api/SmartNarrator.Api.csproj SmartNarrator.Api/
+COPY SmartNarrator.Worker/SmartNarrator.Worker.csproj SmartNarrator.Worker/
+
+RUN dotnet restore SmartNarrator.sln
+
+COPY SmartNarrator.Domain/ SmartNarrator.Domain/
+COPY SmartNarrator.Application/ SmartNarrator.Application/
+COPY SmartNarrator.Infrastructure/ SmartNarrator.Infrastructure/
+COPY SmartNarrator.Api/ SmartNarrator.Api/
+
+RUN dotnet publish SmartNarrator.Api/SmartNarrator.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
+
+# Standalone migration executable for `make deploy` (same migrations assembly as runtime API).
+ENV PATH="$PATH:/root/.dotnet/tools"
+RUN dotnet tool install --global dotnet-ef --version 8.0.11
+WORKDIR /src
+RUN dotnet ef migrations bundle \
+    --project SmartNarrator.Infrastructure/SmartNarrator.Infrastructure.csproj \
+    --startup-project SmartNarrator.Api/SmartNarrator.Api.csproj \
+    --output /app/db-migrate \
+    --force
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+COPY --from=build /app/db-migrate /app/db-migrate
+RUN chmod +x /app/db-migrate || true
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "SmartNarrator.Api.dll"]

@@ -1,0 +1,57 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: var(--sn-bg);
+  color: var(--sn-text);
+  font-family:
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: baseline;
+  padding: 1rem 1.75rem;
+  border-bottom: 1px solid var(--sn-border);
+  background: var(--sn-surface);
+}
+
+.site-nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.site-nav a {
+  color: var(--sn-link);
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.site-nav a:hover {
+  text-decoration: underline;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-decoration: none;
+  color: var(--sn-link);
+}
+
+.tagline {
+  font-size: 0.9rem;
+  opacity: 0.78;
+}
+
+.site-main {
+  padding: 1.5rem 1.75rem 3rem;
+}
+
+button {
+  cursor: pointer;
+}

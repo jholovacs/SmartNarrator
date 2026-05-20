@@ -1,0 +1,6 @@
+@SmartNarrator.Api_HostAddress = http://localhost:5022
+
+GET {{SmartNarrator.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

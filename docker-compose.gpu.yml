@@ -1,0 +1,13 @@
+# Merge after docker-compose.yml + docker-compose.dev.yml when .env has OLLAMA_USE_GPU=1
+# (see scripts/configure-ollama-gpu-choice.sh). Requires NVIDIA drivers + NVIDIA Container Toolkit
+# so `docker run --gpus all` works on the host.
+
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

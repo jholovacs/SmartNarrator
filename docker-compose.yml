@@ -1,0 +1,125 @@
+name: smartnarrator
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - smartnarrator_rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [sn]
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: smartnarrator
+    volumes:
+      - smartnarrator_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [sn]
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - smartnarrator_ollama:/root/.ollama
+    networks: [sn]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    volumes:
+      - smartnarrator_storage:/app/App_Data/storage
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Default: Host=postgres;Port=5432;Username=postgres;Password=postgres;Database=smartnarrator
+      Jobs__DispatchMode: ${JOBS_DISPATCH_MODE:-RabbitMq}
+      Jobs__NotifyApiBaseUrl: ${JOBS_NOTIFY_API_BASE_URL:-http://api:8080/}
+      Jobs__InternalNotifyApiKey: ${JOBS_INTERNAL_NOTIFY_API_KEY:-dev-internal-notify-key}
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_USER:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
+      Ollama__BaseUri: http://ollama:11434
+      Ollama__Model: ${OLLAMA_CHAT_MODEL:-llama3.2}
+      Ollama__MaxCharactersPerRequest: ${OLLAMA_MAX_CHARS_PER_REQUEST:-56000}
+      Ollama__AnalysisChunkOverlapUtf16: ${OLLAMA_ANALYSIS_CHUNK_OVERLAP:-640}
+      Ollama__AnalysisPriorParagraphMaxBackUtf16: ${OLLAMA_ANALYSIS_PRIOR_PARAGRAPH_MAX_BACK:-24000}
+      Ollama__SpeakerConfidenceNeedsReviewThreshold: ${OLLAMA_SPEAKER_REVIEW_THRESHOLD:-0.62}
+      Ollama__SpeakerConfidenceAutoTrustThreshold: ${OLLAMA_SPEAKER_AUTO_TRUST_THRESHOLD:-0.8}
+      Ollama__AnalysisTemperature: ${OLLAMA_ANALYSIS_TEMPERATURE:-0.28}
+      Ollama__CaptureAnalyzeLlmTurns: ${OLLAMA_CAPTURE_ANALYZE_LLM_TURNS:-false}
+      Ollama__AnalyzeDiagnosticsMaxCharsPerField: ${OLLAMA_ANALYZE_DIAG_MAX_CHARS_PER_FIELD:-200000}
+      SpeechSynthesis__BaseUri: ${SPEECH_SYNTHESIS_BASE_URI:-http://host.docker.internal:8899}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [sn]
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    volumes:
+      - smartnarrator_storage:/app/App_Data/storage
+    environment:
+      ConnectionStrings__Default: Host=postgres;Port=5432;Username=postgres;Password=postgres;Database=smartnarrator
+      Jobs__NotifyApiBaseUrl: ${JOBS_NOTIFY_API_BASE_URL:-http://api:8080/}
+      Jobs__InternalNotifyApiKey: ${JOBS_INTERNAL_NOTIFY_API_KEY:-dev-internal-notify-key}
+      Jobs__RabbitMqGeneralPrefetch: ${JOBS_RABBITMQ_GENERAL_PREFETCH:-4}
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: ${RABBITMQ_USER:-guest}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-guest}
+      Ollama__BaseUri: http://ollama:11434
+      Ollama__Model: ${OLLAMA_CHAT_MODEL:-llama3.2}
+      Ollama__MaxCharactersPerRequest: ${OLLAMA_MAX_CHARS_PER_REQUEST:-56000}
+      Ollama__AnalysisChunkOverlapUtf16: ${OLLAMA_ANALYSIS_CHUNK_OVERLAP:-640}
+      Ollama__AnalysisPriorParagraphMaxBackUtf16: ${OLLAMA_ANALYSIS_PRIOR_PARAGRAPH_MAX_BACK:-24000}
+      Ollama__SpeakerConfidenceNeedsReviewThreshold: ${OLLAMA_SPEAKER_REVIEW_THRESHOLD:-0.62}
+      Ollama__SpeakerConfidenceAutoTrustThreshold: ${OLLAMA_SPEAKER_AUTO_TRUST_THRESHOLD:-0.8}
+      Ollama__AnalysisTemperature: ${OLLAMA_ANALYSIS_TEMPERATURE:-0.28}
+      Ollama__CaptureAnalyzeLlmTurns: ${OLLAMA_CAPTURE_ANALYZE_LLM_TURNS:-false}
+      Ollama__AnalyzeDiagnosticsMaxCharsPerField: ${OLLAMA_ANALYZE_DIAG_MAX_CHARS_PER_FIELD:-200000}
+      SpeechSynthesis__BaseUri: ${SPEECH_SYNTHESIS_BASE_URI:-http://host.docker.internal:8899}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [sn]
+
+  spa:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_started
+    networks: [sn]
+
+volumes:
+  smartnarrator_pg:
+  smartnarrator_ollama:
+  smartnarrator_rabbitmq:
+  smartnarrator_storage:
+
+networks:
+  sn:
+    driver: bridge

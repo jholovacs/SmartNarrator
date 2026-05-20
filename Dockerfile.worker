@@ -1,0 +1,24 @@
+# syntax=docker/dockerfile:1
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+COPY SmartNarrator.sln ./
+COPY SmartNarrator.Domain/SmartNarrator.Domain.csproj SmartNarrator.Domain/
+COPY SmartNarrator.Application/SmartNarrator.Application.csproj SmartNarrator.Application/
+COPY SmartNarrator.Infrastructure/SmartNarrator.Infrastructure.csproj SmartNarrator.Infrastructure/
+COPY SmartNarrator.Worker/SmartNarrator.Worker.csproj SmartNarrator.Worker/
+
+RUN dotnet restore SmartNarrator.Worker/SmartNarrator.Worker.csproj
+
+COPY SmartNarrator.Domain/ SmartNarrator.Domain/
+COPY SmartNarrator.Application/ SmartNarrator.Application/
+COPY SmartNarrator.Infrastructure/ SmartNarrator.Infrastructure/
+COPY SmartNarrator.Worker/ SmartNarrator.Worker/
+
+RUN dotnet publish SmartNarrator.Worker/SmartNarrator.Worker.csproj -c Release -o /app/publish /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/runtime:8.0 AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+RUN mkdir -p App_Data/storage
+ENTRYPOINT ["dotnet", "SmartNarrator.Worker.dll"]
